@@ -40,6 +40,10 @@
 
 #include <QMediaPlayer>
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+    #include <QAudioOutput>
+#endif
+
 class BasicRingtoneNotificationProviderPrivate
 {
     Q_DECLARE_PUBLIC(BasicRingtoneNotificationProvider)
@@ -98,8 +102,16 @@ bool BasicRingtoneNotificationProvider::configure(VoiceCallManagerInterface *man
     QObject::connect(manager, SIGNAL(voiceCallAdded(AbstractVoiceCallHandler*)), SLOT(onVoiceCallAdded(AbstractVoiceCallHandler*)));
     QObject::connect(manager, SIGNAL(silenceRingtoneRequested()), d->player, SLOT(stop()));
 
-    d->player->setMedia(QMediaContent(QUrl::fromLocalFile("/usr/share/voicecall/sounds/ring-1.wav")));
-    d->player->setVolume(100);
+    #if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+        QAudioOutput *audioOutput = new QAudioOutput;
+        d->player->setAudioOutput(audioOutput);
+
+        d->player->setSource(QUrl::fromLocalFile("/usr/share/voicecall/sounds/ring-1.wav"));
+        audioOutput->setVolume(1.0);
+    #else
+        d->player->setMedia(QMediaContent(QUrl::fromLocalFile("/usr/share/voicecall/sounds/ring-1.wav")));
+        d->player->setVolume(100);
+    #endif
     QObject::connect(d->player, SIGNAL(mediaStatusChanged(QMediaPlayer::MediaStatus)), SLOT(onMediaPlayerMediaStatusChanged()));
 
     return true;
@@ -150,7 +162,12 @@ void BasicRingtoneNotificationProvider::onVoiceCallStatusChanged()
         d->player->setPosition(0);
 
         d->currentCall = NULL;
-    } else if (d->player->state() != QMediaPlayer::PlayingState) {
+            } 
+            #if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+                else if (d->player->playbackState() != QMediaPlayer::PlayingState) {
+            #else
+                else if (d->player->state() != QMediaPlayer::PlayingState) {
+            #endif
         d->player->setPosition(0);
         d->player->play();
     }

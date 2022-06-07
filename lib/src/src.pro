@@ -3,7 +3,9 @@ TARGET = voicecall
 
 QT = core dbus
 
-CONFIG += c++11
+equals(QT_MAJOR_VERSION, 5):{
+    CONFIG += c++11
+}
 
 HEADERS += \
     common.h \

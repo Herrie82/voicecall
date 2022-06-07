@@ -45,6 +45,13 @@
 #include <QStandardPaths>
 #include <QtDebug>
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+#include <QAudioFormat>
+#include <QAudioDevice>
+#include <QAudioSource>
+#include <QMediaDevices>
+#endif
+
 #include <unistd.h>
 
 namespace {
@@ -56,7 +63,11 @@ const QString CallRecordingsDirPath = QStringLiteral("%1/system/privileged/Phone
 
 const quint16 ChannelCount = 1;
 const quint16 SampleRate = 8000;
-const quint16 SampleBits = 16;
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+    const QAudioFormat::SampleFormat SampleBits = QAudioFormat::Int16;
+#else
+    const quint16 SampleBits = 16;
+#endif
 const quint32 WaveHeaderLength = 44;
 const quint16 WavePCMFormat = 1;
 
@@ -70,14 +81,27 @@ QAudioFormat getRecordingFormat()
 
     format.setChannelCount(ChannelCount);
     format.setSampleRate(SampleRate);
-    format.setSampleSize(SampleBits);
-    format.setCodec(QStringLiteral("audio/pcm"));
-    format.setByteOrder(QAudioFormat::LittleEndian);
-    format.setSampleType(QAudioFormat::UnSignedInt);
+    #if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+        format.setSampleFormat(SampleBits);
+    #else
+        format.setSampleSize(SampleBits);
+        format.setCodec(QStringLiteral("audio/pcm"));
+        format.setByteOrder(QAudioFormat::LittleEndian);
+        format.setSampleType(QAudioFormat::UnSignedInt);
+    #endif
 
-    QAudioDeviceInfo info(QAudioDeviceInfo::defaultInputDevice());
+    #if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+        QAudioDevice info = QMediaDevices::defaultAudioInput();
+    #else
+        QAudioDeviceInfo info(QAudioDeviceInfo::defaultInputDevice());
+    #endif
+
     if (!info.isFormatSupported(format)) {
+    #if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+        format = info.preferredFormat();
+    #else
         format = info.nearestFormat(format);
+    #endif
     }
 
     return format;
@@ -296,9 +320,13 @@ bool VoiceCallAudioRecorder::initiateRecording(const QString &fileName)
 
     output.swap(file);
 
-    input.reset(new QAudioInput(recordingFormat));
-    connect(input.data(), &QAudioInput::stateChanged, this, &VoiceCallAudioRecorder::inputStateChanged);
-
+    #if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+        input.reset(new QAudioSource(recordingFormat));
+        connect(input.data(), &QAudioSource::stateChanged, this, &VoiceCallAudioRecorder::inputStateChanged);
+    #else
+        input.reset(new QAudioInput(recordingFormat));
+        connect(input.data(), &QAudioInput::stateChanged, this, &VoiceCallAudioRecorder::inputStateChanged);
+    #endif
     input->start(output.data());
     active = true;
     emit recordingChanged();
